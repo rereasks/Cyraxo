@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyraxoHealth — Clinical Workspace</title>
+    <link rel="icon" type="image/png" href="../logo.png" />
+    <link rel="stylesheet" href="style.css?v=3">
+</head>
+<body>
+    <div class="noise-overlay"></div>
+    <div class="dash-container">
+        <header class="dash-header">
+            <div>
+                <div class="logo">CyraxoHealth <span>Clinical Hub</span></div>
+                <p style="color: var(--text-muted);">Institutional Node Active</p>
+            </div>
+            <div style="display: flex; gap: 16px; align-items: center;">
+                <div style="text-align: right;">
+                    <div id="user-email" style="font-weight: 600; font-size: 0.9rem;">--</div>
+                    <div style="font-size: 0.75rem; color: var(--success); opacity: 0.8;">Secure Business Auth</div>
+                </div>
+                <button id="logout-btn" class="btn btn-secondary" style="border: 1px solid var(--border); padding: 8px 16px; font-size: 0.8rem;">Logout</button>
+            </div>
+        </header>
+
+        <section class="module-selection">
+            <h1 style="font-size: 2.2rem; margin-bottom: 40px; font-weight: 700;">Select Diagnostic Module</h1>
+            
+            <!-- Dynamic State Loading -->
+            <div id="loading-state" style="text-align: center; padding: 60px; font-size: 1.1rem; color: var(--text-muted);">
+                Validating Institutional Licenses...
+            </div>
+
+            <!-- Access Denied State (Hidden by default) -->
+            <div id="access-denied" style="display: none; background: var(--bg-surface); border: 1px solid var(--danger); border-radius: 20px; padding: 40px; text-align: center; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: var(--danger); margin-bottom: 12px;">Subscription Inactive</h2>
+                <p style="margin-bottom: 24px;">Your institutional node has no active diagnostic licenses. Please contact your account manager for procurement.</p>
+                <a href="../contact.html" class="btn btn-secondary">Request Activation</a>
+            </div>
+
+            <div class="module-grid" id="module-grid" style="display: none;">
+                <!-- Posture App Module -->
+                <div class="module-card" id="module-posture" style="display: none;" onclick="window.location.href='posture/index.html?tab=patients'">
+                    <div class="module-icon">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                    </div>
+                    <div>
+                        <h2>Posture + Patient Manager</h2>
+                        <p>Add patients, generate recovery codes, manage AI therapy plans, and review motion-analysis progress.</p>
+                    </div>
+                    <div class="btn btn-primary" style="margin-top: auto; width: fit-content;">Open Patient Manager</div>
+                </div>
+            </div>
+        </section>
+
+        <footer style="margin-top: 80px; padding-top: 40px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--text-muted);">
+            <div>© 2026 CyraxoHealth AI · Edge-Clinical Architecture</div>
+            <div style="display: flex; gap: 24px;">
+                <a href="../contact.html" style="color: inherit; text-decoration: none;">Support Node</a>
+                <a href="#" style="color: inherit; text-decoration: none;">Clinical Terms</a>
+                <span style="color: var(--success); font-weight: 700;">HIPAA Anonymization Active</span>
+            </div>
+        </footer>
+    </div>
+
+    <script type="module">
+        import { auth, db, onAuthStateChanged, signOut, doc, getDoc } from './firebase-config.js';
+
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                window.location.href = 'login.html';
+            } else {
+                try {
+                    // Fetch Vetting & Subscription Record
+                    const clinicRef = doc(db, 'clinics', user.uid);
+                    const clinicSnap = await getDoc(clinicRef);
+                    
+                    document.getElementById('loading-state').style.display = 'none';
+
+                    if (clinicSnap.exists()) {
+                        const data = clinicSnap.data();
+                        const displayId = data.clinicId || data.clinicCode || sessionStorage.getItem('cyrax_clinic_id') || user.email;
+                        document.getElementById('user-email').innerText = displayId;
+                        const subs = data.subscriptions || [];
+                        let hasModules = false;
+
+                        if (subs.includes('posture')) {
+                            document.getElementById('module-posture').style.display = 'flex';
+                            hasModules = true;
+                        }
+
+                        if (hasModules) {
+                            document.getElementById('module-grid').style.display = 'grid';
+                        } else {
+                            // No subscriptions active for this vetted clinic
+                            document.getElementById('access-denied').style.display = 'block';
+                        }
+                    } else {
+                        document.getElementById('user-email').innerText = sessionStorage.getItem('cyrax_clinic_id') || user.email;
+                        // Not vetted / No Firestore record yet
+                        document.getElementById('access-denied').style.display = 'block';
+                    }
+                } catch (err) {
+                    console.error("Clinical Node Failure:", err);
+                    document.getElementById('loading-state').innerText = "Critical Connection Error. Please refresh.";
+                }
+            }
+        });
+
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            signOut(auth).then(() => {
+                window.location.href = 'login.html';
+            });
+        });
+    </script>
+</body>
+</html>

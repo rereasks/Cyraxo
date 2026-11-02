@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyraxoHealth — Clinical Hair Hub</title>
+    <link rel="icon" type="image/png" href="../../logo.png" />
+    <link rel="stylesheet" href="../../hair-consult/styles.css?v=3">
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body class="clinical-portal">
+    <div class="noise-overlay"></div>
+    <div id="app-mount" class="app-wrapper">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar no-print">
+            <div class="sidebar-header">
+                <div class="logo">CyraxoHealth <span>Admin</span></div>
+                <p style="font-size: 0.7rem; color: var(--text-muted); padding: 0 12px;">ID-Anonymized Workspace</p>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" onclick="switchView('dashboard')" id="nav-dashboard" class="nav-item active">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 12h.01M16 12h.01M8 12h.01M12 16h.01M16 16h.01M8 16h.01M12 8h.01M16 8h.01M8 8h.01M12 21c-4.97 0-9-4.03-9-9s4.48-9 9-9 9 4.03 9 9-4.03 9-9 9z"/></svg>
+                    Scalp Scan
+                </a>
+                <a href="#" onclick="switchView('records')" id="nav-records" class="nav-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                    Scan History
+                </a>
+                <a href="../index.html" class="nav-item" style="margin-top: auto;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/></svg>
+                    Institutional Hub
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            <!-- Header Bar -->
+            <header class="top-bar no-print">
+                <div class="breadcrumb">
+                    Business Portal / <span>Hair Node</span>
+                </div>
+                <div class="user-profile">
+                    <div style="text-align: right; margin-right: 12px;">
+                        <span id="clinic-display-name" style="font-weight: 600; font-size: 0.9rem;">--</span>
+                        <div style="font-size: 0.7rem; color: var(--success);">Cloud Sync: Active</div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="workspace">
+                 <!-- VIEW: Dashboard -->
+                 <div id="view-dashboard" class="app-view active">
+                    <div class="grid">
+                        <div class="viewport-section">
+                            <div class="controls panel no-print" style="margin-bottom: 20px; display: flex; gap: 12px; align-items: center; background: var(--bg-surface);">
+                                <button class="btn btn-primary" onclick="setTool('inspect')">Standard Inspect</button>
+                                <button class="btn btn-secondary" onclick="setTool('region')">Zone Capture</button>
+                                <button class="btn btn-secondary" onclick="setTool('draw')">Annotate</button>
+                                <button class="btn btn-secondary" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); margin-left: auto;" onclick="clearCanvas()">Reset Board</button>
+                            </div>
+
+                            <div class="controls panel no-print">
+                                <div class="control-group">
+                                    <label>Donor Scan Upload:</label>
+                                    <label for="image-upload" class="btn btn-secondary" style="width: 100%;">Process Scalp Image</label>
+                                    <input type="file" id="image-upload" accept="image/*" style="display: none;">
+                                </div>
+                            </div>
+
+                            <div class="canvas-container panel">
+                                <h2 id="print-report-title" class="only-print">Donor Analysis Report: [Anonymized]</h2>
+                                <canvas id="working-canvas" style="display: none;"></canvas>
+                                <canvas id="output-canvas"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="results-section">
+                            <div class="metrics-grid">
+                                <div class="metric-card"><span class="label">Density (FU/cm²)</span><span class="value" id="metric-density">--</span></div>
+                                <div class="metric-card"><span class="label">Est. Grafts</span><span class="value" id="metric-follicles">--</span></div>
+                                <div class="metric-card"><span class="label">Safety Index</span><span class="value" id="metric-safety">--</span></div>
+                            </div>
+
+                            <div class="panel issues-panel">
+                                <h3>Surgical Zone Monitor</h3>
+                                <ul id="region-list" class="issues-list" style="margin-bottom: 20px;">
+                                    <li class="empty-state">No custom donor zones defined.</li>
+                                </ul>
+                                
+                                <h3>Automated Patch Detection</h3>
+                                <ul id="issues-list" class="issues-list">
+                                    <li class="empty-state">No follicle signals detected for current diagnostic session.</li>
+                                </ul>
+                            </div>
+
+                            <div class="panel no-print">
+                                <h3>Patient Documentation</h3>
+                                <div class="control-group" style="margin-bottom: 12px;">
+                                    <label>Patient Name (PDF ONLY):</label>
+                                    <input type="text" id="report-patient-name" placeholder="John Doe" style="width: 100%; border: 1px solid var(--border); background: #0b0d12; color: white; border-radius: 8px; padding: 10px;">
+                                </div>
+                                <div style="display: flex; gap: 8px;">
+                                    <button class="btn btn-primary" style="flex: 1;" id="sync-btn" onclick="syncToCloud()">Sync Anonymized</button>
+                                    <button class="btn btn-secondary" style="flex: 1;" onclick="printClinicalReport()">Export Patient PDF</button>
+                                </div>
+                                <p style="font-size: 0.65rem; color: var(--text-muted); margin-top: 8px;">Name is only used for the local PDF report and will NOT be saved to the business cloud vault.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VIEW: Records -->
+                <div id="view-records" class="app-view">
+                    <header class="header" style="text-align: left; margin-bottom: 32px;">
+                        <h1 style="font-size: 2rem;">Clinical Cloud Vault</h1>
+                        <p style="color: var(--text-muted);">Fully anonymized history of previous scalp analysis sessions.</p>
+                    </header>
+                    <div class="panel">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid var(--border); text-align: left;">
+                                    <th style="padding: 12px;">Cyraxo-ID</th>
+                                    <th style="padding: 12px;">Date</th>
+                                    <th style="padding: 12px;">Metrics</th>
+                                    <th style="padding: 12px;">Privacy Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="records-table-body">
+                                <!-- Firestore -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script type="module" src="app.js"></script>
+</body>
+</html>

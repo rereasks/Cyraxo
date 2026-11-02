@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyraxoHealth — Clinical Posture Hub</title>
+    <link rel="icon" type="image/png" href="../../logo.png" />
+    <link rel="stylesheet" href="../../posture-app/styles.css?v=6">
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="clinical.css?v=3">
+    <!-- MediaPipe Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js" crossorigin="anonymous"></script>
+</head>
+<body class="clinical-portal">
+    <div id="app-mount" class="app-wrapper">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar no-print">
+            <div class="sidebar-header">
+                <div class="logo">CyraxoHealth <span>Clinic</span></div>
+                <p style="font-size: 0.7rem; color: rgba(255,255,255,0.6); padding: 0 12px;">Diagnostic Workspace v2.4</p>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" onclick="switchTab('summary')" id="nav-summary" class="nav-item active">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                    Clinic Summary
+                </a>
+                <a href="#" onclick="switchTab('patients')" id="nav-patients" class="nav-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    Patient Manager
+                </a>
+                <a href="#" onclick="switchTab('recovery')" id="nav-recovery" class="nav-item patient-context-nav" style="display: none;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    Recovery Plan
+                </a>
+                <a href="#" onclick="switchTab('progress')" id="nav-progress" class="nav-item patient-context-nav" style="display: none;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                    Progress Map
+                </a>
+                <a href="#" onclick="switchTab('reports')" id="nav-reports" class="nav-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+                    Reports
+                </a>
+                <a href="#" onclick="switchTab('settings')" id="nav-settings" class="nav-item">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 19.4a1.65 1.65 0 0 0-1 .6 1.65 1.65 0 0 0-.33 1.82V22a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 20a1.65 1.65 0 0 0-1.82-.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-.6-1 1.65 1.65 0 0 0-1.82-.33H2a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4 9a1.65 1.65 0 0 0 .33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-.6A1.65 1.65 0 0 0 10.33 2H14a2 2 0 0 1 0 4h-.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.31.36.57.6.78.37.32.87.43 1.33.33H22a2 2 0 0 1 0 4h-.09A1.65 1.65 0 0 0 19.4 15z"/></svg>
+                    Settings
+                </a>
+                <a href="../index.html" class="nav-item" style="margin-top: auto;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/></svg>
+                    Exit Portal
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            <!-- Header Bar -->
+            <header class="top-bar no-print">
+                <div class="breadcrumb">
+                    Business Portal / <span id="view-title">Summary Dashboard</span>
+                </div>
+                <div class="user-profile">
+                    <div style="text-align: right; margin-right: 12px;">
+                        <span id="clinic-display-name" style="font-weight: 600; font-size: 0.9rem; color: var(--text-main);">--</span>
+                        <div style="font-size: 0.7rem; color: var(--success);">Session Status: Secure Node</div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="makeReport()">Make Report</button>
+                </div>
+            </header>
+
+            <div class="workspace">
+                 <!-- VIEW: Onboarding (Guided Scan) -->
+                 <div id="view-onboarding" class="app-view active">
+                    <div class="onboarding-flow">
+                        <div class="step-indicator">
+                            <span class="step-dot active" id="dot-1"></span>
+                            <span class="step-dot" id="dot-2"></span>
+                            <span class="step-dot" id="dot-3"></span>
+                        </div>
+                        
+                        <div id="onboard-step-content" class="panel" style="padding: 40px; text-align: center;">
+                            <h2 id="step-title">Initial Baseline Calibration</h2>
+                            <p id="step-desc" style="color: var(--text-muted); margin-bottom: 32px;">Please upload a clear profile image (SIDE VIEW) for initial kinetic benchmarking.</p>
+                            
+                            <div class="canvas-container" style="border: 1px dashed var(--border); border-radius: 20px; background: var(--bg-elevated); margin-bottom: 24px;">
+                                <canvas id="output-canvas"></canvas>
+                                <div id="status-overlay" class="status-overlay">Awaiting Side Profile...</div>
+                            </div>
+                            
+                            <input type="hidden" id="profile-type" value="side">
+                            <label for="image-upload" class="btn btn-primary btn-lg" style="width: 100%;" id="onboard-action-btn">Capture Side Profile</label>
+                            <input type="file" id="image-upload" accept="image/*" style="display: none;">
+                        </div>
+                    </div>
+                 </div>
+
+                 <!-- VIEW: Summary Dashboard -->
+                 <div id="view-summary" class="app-view">
+                    <section class="clinic-hero panel">
+                        <div>
+                            <p class="eyebrow">Clinical posture workspace</p>
+                            <h1>Patient baseline and progress</h1>
+                            <p>Review the latest motion analysis, generate recovery guidance, and export patient-ready progress reports.</p>
+                        </div>
+                        <div class="clinic-actions">
+                            <label for="image-upload" class="btn btn-secondary">New Scan</label>
+                            <button class="btn btn-primary" onclick="makeReport()">Make Report</button>
+                        </div>
+                    </section>
+
+                    <div class="clinic-layout">
+                        <section class="panel patient-panel">
+                            <div class="field-grid">
+                                <label>
+                                    <span>Patient name</span>
+                                    <input id="report-patient-name" type="text" placeholder="Patient name for report">
+                                </label>
+                                <label>
+                                    <span>Report notes</span>
+                                    <input id="report-notes" type="text" placeholder="Optional clinical note">
+                                </label>
+                            </div>
+                            <div class="analysis-summary">
+                                <div>
+                                    <span>Motion engine</span>
+                                    <strong id="motion-engine-status">Checking...</strong>
+                                </div>
+                                <div>
+                                    <span>Last scan</span>
+                                    <strong id="last-scan-status">No scan yet</strong>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="metrics-grid">
+                            <div class="metric-card"><span class="label">Cervical</span><span class="value" id="metric-cervical">--</span></div>
+                            <div class="metric-card"><span class="label">Thoracic</span><span class="value" id="metric-thoracic">--</span></div>
+                            <div class="metric-card"><span class="label">Pelvic</span><span class="value" id="metric-pelvic">--</span></div>
+                            <div class="metric-card metric-card-primary"><span class="label">Overall Score</span><span class="value" id="metric-overall">--</span></div>
+                        </section>
+
+                        <section class="panel issues-panel">
+                            <h3>Findings</h3>
+                            <ul id="issues-list" class="issues-list">
+                                <li class="empty-state">No baseline scan found.</li>
+                            </ul>
+                        </section>
+
+                        <section class="panel viz-panel">
+                             <div class="panel-title-row">
+                                 <h3>Clinical Visualization</h3>
+                                 <span class="badge archived" id="profile-label">Awaiting scan</span>
+                             </div>
+                             <div id="viz-placeholder" class="viz-placeholder">
+                                 Upload a side and back profile to begin clinical imaging.
+                             </div>
+                        </section>
+                    </div>
+                 </div>
+
+                 <!-- VIEW: Patient Manager -->
+                 <div id="view-patients" class="app-view">
+                    <section class="patient-manager-shell">
+                        <div class="panel patient-manager-head">
+                            <div>
+                                <p class="eyebrow">Clinic roster</p>
+                                <h1>Patient Manager</h1>
+                                <p class="muted">Add recovery patients, generate access codes, and review motion-analysis progress from home sessions.</p>
+                            </div>
+                            <button class="btn btn-primary" onclick="openPatientModal()">Add Patient</button>
+                        </div>
+
+                        <div class="patient-manager-grid">
+                            <div class="panel patient-form-card">
+                                <h2>Add Patient</h2>
+                                <p class="muted">The recovery plan is generated from the injury, timeline, and clinical instructions entered here.</p>
+                                <div class="field-grid patient-field-grid">
+                                    <label>
+                                        <span>Patient name or ID</span>
+                                        <input id="patient-form-name" type="text" placeholder="MRN-10482 or patient initials">
+                                    </label>
+                                    <label>
+                                        <span>Injury / diagnosis</span>
+                                        <input id="patient-form-injury" type="text" placeholder="ACL repair, shoulder impingement, lumbar strain">
+                                    </label>
+                                    <label>
+                                        <span>Expected recovery time</span>
+                                        <input id="patient-form-timeline" type="number" min="1" max="52" value="6">
+                                    </label>
+                                    <label>
+                                        <span>Timeline unit</span>
+                                        <select id="patient-form-unit">
+                                            <option value="weeks" selected>Weeks</option>
+                                            <option value="days">Days</option>
+                                        </select>
+                                    </label>
+                                    <label>
+                                        <span>Current ROM baseline</span>
+                                        <input id="patient-form-rom" type="number" min="0" max="100" value="52">
+                                    </label>
+                                    <label>
+                                        <span>Target ROM</span>
+                                        <input id="patient-form-target" type="number" min="0" max="100" value="90">
+                                    </label>
+                                    <label class="wide">
+                                        <span>Clinic instructions</span>
+                                        <textarea id="patient-form-notes" rows="3" placeholder="Restrictions, precautions, visit cadence, preferred exercises"></textarea>
+                                    </label>
+                                </div>
+                                <button class="btn btn-primary" onclick="createPatientFromManager()">Generate Code + Plan</button>
+                                <p id="patient-form-status" class="manager-status"></p>
+                            </div>
+
+                            <div class="panel patient-roster-card">
+                                <div class="panel-title-row">
+                                    <div>
+                                        <h2>Active Patients</h2>
+                                        <p class="muted">Codes are unique and can be shared with patients for portal login.</p>
+                                    </div>
+                                    <input id="patient-roster-search" class="compact-input" type="text" placeholder="Search roster" oninput="renderPatientRoster()">
+                                </div>
+                                <div id="patient-roster-list" class="patient-roster-list"></div>
+                            </div>
+                        </div>
+                    </section>
+                 </div>
+
+                 <!-- VIEW: Reports -->
+                 <div id="view-reports" class="app-view">
+                    <div class="panel reports-panel">
+                        <div class="panel-title-row">
+                            <div>
+                                <h2>Progress Report</h2>
+                                <p class="muted">Download a professional patient progress report with scores, findings, treatment plan, and clinic branding.</p>
+                            </div>
+                            <button class="btn btn-primary" onclick="makeReport()">Download Report</button>
+                        </div>
+                        <div id="report-preview" class="report-preview">
+                            <div class="empty-state">Complete a scan to populate the report preview.</div>
+                        </div>
+                    </div>
+                 </div>
+
+                 <!-- VIEW: Recovery Plan (Calendar) -->
+                 <div id="view-recovery" class="app-view">
+                    <div class="panel" style="margin: 24px;">
+                         <div style="display: flex; justify-content: space-between; align-items: center;">
+                             <h2>2-Week Remedial Calendar</h2>
+                             <span class="badge success">Active Protocol</span>
+                         </div>
+                         <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 8px;">Personalized therapeutic sequence targeting your specific kinetic offsets.</p>
+                         
+                         <div class="calendar-grid" id="calendar-mount">
+                             <!-- Calendar Days -->
+                         </div>
+                    </div>
+
+                    <div class="panel" style="margin: 24px;">
+                         <h3>Recommended Therapeutic Exercises</h3>
+                         <div id="exercise-library" class="exercises-grid" style="margin-top: 20px;">
+                             <p class="empty-state">Complete a baseline scan to unlock recovery protocols.</p>
+                         </div>
+                    </div>
+                 </div>
+
+                 <!-- VIEW: Progress Map -->
+                 <div id="view-progress" class="app-view">
+                     <div class="panel" style="margin: 24px;">
+                         <h2>Long-term Biometric Progress</h2>
+                         <div id="progress-chart" style="height: 300px; background: var(--bg-elevated); border-radius: 12px; margin-top: 24px; display: flex; align-items: center; justify-content: center; color: var(--text-muted);">
+                             Log 2+ scans to unlock progress delta mapping.
+                         </div>
+                         <div style="margin-top: 40px;">
+                             <h3>Anonymized Audit History</h3>
+                             <div id="records-list" style="margin-top: 16px;">
+                                 <p class="empty-state">No clinical history synced to cloud vault.</p>
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+
+                 <!-- VIEW: Settings -->
+                 <div id="view-settings" class="app-view">
+                    <div class="panel settings-panel">
+                        <h2>Clinic Settings</h2>
+                        <p class="muted">Clinic identity is saved on this device and added to downloaded reports.</p>
+                        <div class="settings-grid">
+                            <div class="field-grid">
+                                <label>
+                                    <span>Clinic name</span>
+                                    <input id="settings-clinic-name" type="text" placeholder="Clinic name">
+                                </label>
+                                <label>
+                                    <span>Phone or email</span>
+                                    <input id="settings-clinic-contact" type="text" placeholder="Contact information">
+                                </label>
+                                <label>
+                                    <span>Address</span>
+                                    <input id="settings-clinic-address" type="text" placeholder="Clinic address">
+                                </label>
+                            </div>
+                            <div class="logo-uploader">
+                                <div id="clinic-logo-preview" class="logo-preview">Logo</div>
+                                <label for="clinic-logo-upload" class="btn btn-secondary">Upload Logo</label>
+                                <input type="file" id="clinic-logo-upload" accept="image/*" style="display: none;">
+                                <button class="btn btn-primary" onclick="saveClinicSettings()">Save Settings</button>
+                            </div>
+                        </div>
+                    </div>
+                 </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- PATIENT CODE LOGIN -->
+    <div id="patient-code-gate" class="patient-code-gate" style="display: none;">
+        <div class="patient-code-card panel">
+            <div class="logo">CyraxoHealth <span>Patient</span></div>
+            <h1>Recovery Portal</h1>
+            <p class="muted">Enter the access code issued by your clinic.</p>
+            <input id="patient-access-code" type="text" placeholder="PX-7K4D2Q" autocomplete="one-time-code">
+            <button class="btn btn-primary" onclick="patientCodeLogin()">Open Dashboard</button>
+            <p id="patient-login-error" class="manager-status danger"></p>
+            <a href="../login.html">Clinic provider login</a>
+        </div>
+    </div>
+
+    <!-- PATIENT DASHBOARD -->
+    <div id="patient-dashboard" class="patient-dashboard" style="display: none;">
+        <aside class="patient-side-menu">
+            <div class="patient-side-brand">
+                <div class="logo">CyraxoHealth <span>Patient</span></div>
+                <p id="patient-side-code">Recovery code</p>
+            </div>
+            <nav>
+                <button class="patient-menu-item active" onclick="switchPatientView('overview')" id="patient-nav-overview"><span>Overview</span></button>
+                <button class="patient-menu-item" onclick="switchPatientView('exercises')" id="patient-nav-exercises"><span>Exercises</span></button>
+                <button class="patient-menu-item" onclick="switchPatientView('motion')" id="patient-nav-motion"><span>Live Motion</span></button>
+                <button class="patient-menu-item" onclick="switchPatientView('schedule')" id="patient-nav-schedule"><span>Schedule</span></button>
+                <button class="patient-menu-item" onclick="switchPatientView('progress')" id="patient-nav-progress"><span>Progress</span></button>
+                <button class="patient-menu-item" onclick="switchPatientView('milestones')" id="patient-nav-milestones"><span>Milestones</span></button>
+            </nav>
+            <button class="btn btn-secondary" onclick="patientLogout()">Logout</button>
+        </aside>
+
+        <main class="patient-main">
+            <header class="patient-dashboard-top">
+                <div>
+                    <p class="eyebrow">Patient recovery</p>
+                    <h1 id="patient-dash-title">Recovery Plan</h1>
+                    <p id="patient-dash-subtitle" class="muted">Motion-analysis plan loaded from clinic instructions.</p>
+                </div>
+                <button class="btn btn-primary" onclick="switchPatientView('motion')">Start Guided Session</button>
+            </header>
+
+            <div class="patient-voice-assistant" id="patient-voice-assistant">
+                <button class="voice-sprite" id="patient-voice-sprite" type="button" onclick="togglePatientVoicePanel()" aria-label="Open Cyraxo Coach">
+                    <img src="../../logo.png" alt="">
+                    <span></span>
+                </button>
+                <div class="voice-assistant-body">
+                    <div class="voice-assistant-head">
+                        <div>
+                            <strong>Cyraxo Coach</strong>
+                            <span id="patient-voice-status">Tap me to talk.</span>
+                        </div>
+                        <div class="voice-assistant-actions">
+                            <button class="btn btn-secondary btn-sm" type="button" onclick="togglePatientVoiceAssistant()" id="patient-voice-toggle">Voice On</button>
+                            <button class="btn btn-secondary btn-sm" type="button" onclick="startPatientAssistantListening()" id="patient-voice-listen">Ask</button>
+                            <button class="voice-minimize" type="button" onclick="togglePatientVoicePanel(false)" aria-label="Minimize Cyraxo Coach" title="Minimize">×</button>
+                        </div>
+                    </div>
+                    <div id="patient-voice-bubble" class="voice-response" aria-live="polite">
+                        <strong>I can coach reps and answer quick questions about today's session.</strong>
+                    </div>
+                    <div class="voice-question-row">
+                        <input id="patient-voice-question" type="text" placeholder="Ask about reps, form, or today's exercises">
+                        <button class="btn btn-primary btn-sm" type="button" onclick="submitPatientAssistantQuestion()">Send</button>
+                    </div>
+                </div>
+            </div>
+
+            <section id="patient-view-overview" class="patient-view active">
+                <div class="patient-dashboard-grid">
+                    <section class="panel patient-stat-panel">
+                        <div class="patient-stat"><span>Progress</span><strong id="patient-stat-progress">0%</strong></div>
+                        <div class="patient-stat"><span>Range of motion</span><strong id="patient-stat-rom">--</strong></div>
+                        <div class="patient-stat"><span>Improvement</span><strong id="patient-stat-improvement">0%</strong></div>
+                        <div class="patient-stat"><span>Sessions</span><strong id="patient-stat-sessions">0</strong></div>
+                    </section>
+                    <section class="panel patient-plan-panel">
+                        <h2>Today's Focus</h2>
+                        <div id="patient-today-focus" class="patient-focus-card"></div>
+                    </section>
+                    <section class="panel patient-plan-panel">
+                        <h2>Recent Activity</h2>
+                        <div id="patient-recent-activity" class="patient-session-history"></div>
+                    </section>
+                </div>
+            </section>
+
+            <section id="patient-view-exercises" class="patient-view">
+                <section class="panel patient-plan-panel">
+                    <h2>Specific Exercises</h2>
+                    <div id="patient-exercise-list" class="patient-exercise-list"></div>
+                </section>
+            </section>
+
+            <section id="patient-view-motion" class="patient-view">
+                <section class="panel patient-motion-panel">
+                    <div class="panel-title-row">
+                        <div>
+                            <h2>Live Motion Analysis</h2>
+                            <p class="muted">The vision model tracks your pose, counts reps, and updates ROM after completion.</p>
+                        </div>
+                        <div class="patient-session-actions">
+                            <button id="patient-motion-btn" class="btn btn-primary" onclick="runPatientMotionAnalysis()">Start Rep Counter</button>
+                            <button id="patient-motion-stop-btn" class="btn btn-secondary" onclick="stopPatientMotionSession()" style="display:none;">End Session</button>
+                        </div>
+                    </div>
+                    <div id="patient-session-guide" class="patient-session-guide">
+                        Select Start Now from today's schedule to begin your daily exercises.
+                    </div>
+                    <div class="patient-current-exercise" id="patient-current-exercise">
+                        <span>Current scheduled exercise</span>
+                        <strong>Start today's session from Overview or Schedule.</strong>
+                        <p>Your clinic-assigned daily sequence will appear here.</p>
+                    </div>
+                    <div class="patient-rep-board">
+                        <div><span>Reps</span><strong id="patient-live-reps">0</strong></div>
+                        <div><span>Target</span><strong id="patient-live-target">10</strong></div>
+                        <div><span>ROM</span><strong id="patient-live-rom">--</strong></div>
+                        <div><span>Form</span><strong id="patient-live-form">--</strong></div>
+                    </div>
+                    <div class="patient-camera-box">
+                        <video id="patient-motion-video" playsinline muted></video>
+                        <canvas id="patient-motion-canvas"></canvas>
+                        <div class="patient-camera-controls" aria-label="Camera controls">
+                            <button type="button" onclick="flipPatientMotionCamera()" aria-label="Flip camera" title="Flip camera">↺</button>
+                            <button id="patient-motion-wide-toggle" type="button" onclick="togglePatientMotionWideCamera()" aria-label="Toggle wide angle" title="Wide angle">0.5x</button>
+                        </div>
+                        <div id="patient-motion-state">Camera standby</div>
+                        <div id="patient-rep-toast" class="patient-rep-toast">Rep counted</div>
+                    </div>
+                    <p id="patient-motion-result" class="manager-status"></p>
+                </section>
+            </section>
+
+            <section id="patient-view-schedule" class="patient-view">
+                <section class="panel patient-plan-panel">
+                    <h2>Schedule</h2>
+                    <div id="patient-schedule-list" class="patient-schedule-list"></div>
+                </section>
+            </section>
+
+            <section id="patient-view-progress" class="patient-view">
+                <section class="panel patient-plan-panel">
+                    <h2>Progress History</h2>
+                    <div id="patient-progress-detail" class="patient-progress-detail"></div>
+                </section>
+            </section>
+
+            <section id="patient-view-milestones" class="patient-view">
+                <section class="panel patient-plan-panel">
+                    <h2>Milestones</h2>
+                    <div id="patient-milestone-list" class="patient-milestone-list"></div>
+                </section>
+            </section>
+        </main>
+    </div>
+
+    <!-- NEW PATIENT MODAL -->
+    <div id="patient-manager-modal" class="guide-modal">
+        <div class="guide-content patient-manager-modal">
+            <button onclick="closePatientModal()" style="position: absolute; top: 20px; right: 20px; border: none; background: none; cursor: pointer; font-size: 1.5rem;">×</button>
+            <h2>Add Patient</h2>
+            <p class="muted">Complete the Patient Manager form, then generate a code and AI recovery plan.</p>
+            <button class="btn btn-primary" onclick="closePatientModal(); switchTab('patients'); document.getElementById('patient-form-name').focus();">Go to Form</button>
+        </div>
+    </div>
+
+    <!-- EXERCISE GUIDE MODAL -->
+    <div id="guide-modal" class="guide-modal">
+        <div class="guide-content">
+            <button onclick="closeGuide()" style="position: absolute; top: 20px; right: 20px; border: none; background: none; cursor: pointer; font-size: 1.5rem;">×</button>
+            <div id="guide-body">
+                <!-- Dynamic Content -->
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>

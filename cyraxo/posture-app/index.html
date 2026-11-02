@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyraxoHealth — Physical Therapy App</title>
+    <link rel="stylesheet" href="styles.css?v=6">
+    <!-- MediaPipe Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js" crossorigin="anonymous"></script>
+
+    <link rel="icon" type="image/png" href="../logo.png" />
+    <link rel="manifest" href="manifest.json">
+    <!-- Google reCAPTCHA v2 -->
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <script type="module" src="ai-engine.js?v=4"></script>
+</head>
+<body>
+    <!-- Auth Gate: Clinic vs Patient -->
+    <div id="demo-gate" class="gate-overlay">
+        <div class="gate-card glass-panel">
+            <h2>CyraxoHealth PT</h2>
+            <p id="gate-subtitle">Select your portal to continue</p>
+            
+            <div id="role-selector" class="role-selector">
+                <div class="role-btn" id="role-clinic" onclick="setRole('clinic')">
+                    <div class="role-icon">🩺</div>
+                    <span style="font-weight: 700; color: var(--text-main);">Clinic</span>
+                </div>
+                <div class="role-btn" id="role-patient" onclick="setRole('patient')">
+                    <div class="role-icon">👤</div>
+                    <span style="font-weight: 700; color: var(--text-main);">Patient</span>
+                </div>
+                <div style="grid-column: 1 / -1; text-align: center; margin-top: 12px;">
+                    <a href="../index.html" style="color: var(--text-muted); text-decoration: none; font-size: 0.9rem;">← Back to Cyraxo Home</a>
+                </div>
+            </div>
+
+            <div id="auth-form" style="display: none;">
+                <div id="gate-error" class="gate-error">Invalid Credentials. Access Denied.</div>
+                
+                <!-- Patient Login Sub-options Toggle -->
+                <div id="patient-login-tabs" class="login-tabs" style="display: none; margin-bottom: 20px; grid-template-columns: repeat(3, 1fr); gap: 8px;">
+                    <button type="button" class="tab-btn active" onclick="setPatientTab('signin')">Sign In</button>
+                    <button type="button" class="tab-btn" onclick="setPatientTab('activate')">Activate Code</button>
+                    <button type="button" class="tab-btn" onclick="setPatientTab('quick')">Quick Access</button>
+                </div>
+
+                <div id="patient-account-fields" style="display: none;">
+                    <input type="text" id="patient-name" class="gate-input" placeholder="Full name" style="margin-bottom: 12px;">
+                    <input type="email" id="patient-email" class="gate-input" placeholder="Email address" style="margin-bottom: 12px;">
+                    <input type="password" id="patient-password" class="gate-input" placeholder="Password" style="margin-bottom: 12px;">
+                </div>
+                <input type="text" id="demo-passkey" class="gate-input" placeholder="Enter Access Key" style="margin-bottom: 16px;">
+                <div class="g-recaptcha" data-sitekey="6LdGNMksAAAAAGbZMblAbU3HD2oeVWpvrYqaSpQt" style="margin-bottom: 16px; display: flex; justify-content: center;"></div>
+                <button class="btn" onclick="checkAuth()" style="width: 100%;">Enter Portal</button>
+                <button class="btn btn-secondary" onclick="resetRole()" style="margin-top: 16px; width: 100%; font-size: 0.9rem;">← Back</button>
+                <div id="clinic-reg-link" style="text-align: center; margin-top: 16px; display: none;">
+                    <a href="#" onclick="showClinicRegistration()" style="color: var(--primary); font-size: 0.85rem; font-weight: 600; text-decoration: none;">New to CyraxoHealth? Register your clinic.</a>
+                </div>
+                <p style="font-size: 0.65rem; color: var(--text-faint); margin-top: 14px; text-align: center; opacity: 0.6;">Protected by reCAPTCHA. <a href="https://policies.google.com/privacy" style="color: var(--primary);">Privacy</a> & <a href="https://policies.google.com/terms" style="color: var(--primary);">Terms</a> apply.</p>
+            </div>
+
+            <div id="clinic-reg-form" style="display: none; text-align: left;">
+                <h3 style="font-size: 1.5rem; margin-bottom: 8px;">Clinic Registration</h3>
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">Apply for enterprise access to CyraxoHealth.</p>
+                
+                <div class="control-group" style="margin-bottom: 12px;">
+                    <label style="font-size: 0.75rem;">Clinic Name</label>
+                    <input type="text" id="reg-clinic-name" class="gate-input" placeholder="e.g. Houston Sports Therapy" style="width: 100%; box-sizing: border-box; padding: 12px;">
+                </div>
+                <div class="control-group" style="margin-bottom: 12px;">
+                    <label style="font-size: 0.75rem;">Provider NPI Number</label>
+                    <input type="text" id="reg-clinic-npi" class="gate-input" placeholder="10-digit NPI" style="width: 100%; box-sizing: border-box; padding: 12px;">
+                </div>
+                <div class="control-group" style="margin-bottom: 24px;">
+                    <label style="font-size: 0.75rem;">Official Email</label>
+                    <input type="text" id="reg-clinic-email" class="gate-input" placeholder="director@clinic.com" style="width: 100%; box-sizing: border-box; padding: 12px;">
+                </div>
+                
+                <button class="btn" onclick="submitClinicRegistration()" style="width: 100%;">Submit Application</button>
+                <button class="btn btn-secondary" onclick="hideClinicRegistration()" style="width: 100%; margin-top: 12px;">Cancel</button>
+            </div>
+            
+            <div id="clinic-reg-success" style="display: none; text-align: center; padding: 20px 0;">
+                <div style="font-size: 3rem; margin-bottom: 16px;">✅</div>
+                <h3 style="font-size: 1.3rem; margin-bottom: 8px;">Application Received</h3>
+                <p style="color: var(--text-muted); font-size: 0.95rem; margin-bottom: 24px;">Our compliance team will verify your NPI and contact you within 24 hours.</p>
+                <button class="btn btn-secondary" onclick="resetRole()" style="width: 100%;">Return Home</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedRole = null;
+        let activePatientTab = 'signin';
+
+        function setPatientTab(tab) {
+            activePatientTab = tab;
+            document.querySelectorAll('#patient-login-tabs .tab-btn').forEach(btn => btn.classList.remove('active'));
+            const clickedBtn = Array.from(document.querySelectorAll('#patient-login-tabs .tab-btn')).find(btn => 
+                btn.getAttribute('onclick').includes(tab)
+            );
+            if (clickedBtn) clickedBtn.classList.add('active');
+
+            const nameInput = document.getElementById('patient-name');
+            const emailInput = document.getElementById('patient-email');
+            const passInput = document.getElementById('patient-password');
+            const keyInput = document.getElementById('demo-passkey');
+            const submitBtn = document.querySelector('#auth-form .btn');
+            
+            // Hide everything by default
+            if (nameInput) nameInput.style.display = 'none';
+            if (emailInput) emailInput.style.display = 'none';
+            if (passInput) passInput.style.display = 'none';
+            if (keyInput) keyInput.style.display = 'none';
+
+            if (tab === 'signin') {
+                if (emailInput) emailInput.style.display = 'block';
+                if (passInput) passInput.style.display = 'block';
+                if (submitBtn) submitBtn.innerText = 'Sign In';
+            } else if (tab === 'activate') {
+                if (nameInput) nameInput.style.display = 'block';
+                if (emailInput) emailInput.style.display = 'block';
+                if (passInput) passInput.style.display = 'block';
+                if (keyInput) {
+                    keyInput.style.display = 'block';
+                    keyInput.placeholder = 'Enter Clinic-issued Code';
+                }
+                if (submitBtn) submitBtn.innerText = 'Link & Create Account';
+            } else if (tab === 'quick') {
+                if (keyInput) {
+                    keyInput.style.display = 'block';
+                    keyInput.placeholder = 'Enter Clinic-issued Code';
+                }
+                if (submitBtn) submitBtn.innerText = 'Enter Recovery Portal';
+            }
+        }
+
+        function setRole(role) {
+            selectedRole = role;
+            document.getElementById('role-selector').style.display = 'none';
+            document.getElementById('gate-subtitle').innerText = role === 'clinic' ? 'Clinic Practitioner Login' : 'Patient Recovery Portal';
+            document.getElementById('auth-form').style.display = 'block';
+            
+            const tabsContainer = document.getElementById('patient-login-tabs');
+            const accessKey = document.getElementById('demo-passkey');
+            const patientFields = document.getElementById('patient-account-fields');
+            
+            if (role === 'patient') {
+                if (tabsContainer) tabsContainer.style.display = 'grid';
+                if (patientFields) patientFields.style.display = 'block';
+                setPatientTab('signin');
+            } else {
+                if (tabsContainer) tabsContainer.style.display = 'none';
+                if (patientFields) patientFields.style.display = 'none';
+                if (accessKey) {
+                    accessKey.value = '';
+                    accessKey.placeholder = 'Enter Clinic Key';
+                    accessKey.style.display = 'block';
+                }
+                document.querySelector('#auth-form .btn').innerText = 'Enter Portal';
+            }
+        }
+
+        function resetRole() {
+            selectedRole = null;
+            document.getElementById('role-selector').style.display = 'grid';
+            document.getElementById('auth-form').style.display = 'none';
+            document.getElementById('patient-account-fields').style.display = 'none';
+            document.getElementById('patient-login-tabs').style.display = 'none';
+            document.getElementById('demo-passkey').style.display = 'block';
+            document.getElementById('demo-passkey').value = '';
+            document.getElementById('clinic-reg-form').style.display = 'none';
+            document.getElementById('clinic-reg-success').style.display = 'none';
+            document.getElementById('gate-subtitle').innerText = 'Select your portal to continue';
+            document.querySelector('#auth-form .btn').innerText = 'Enter Portal';
+        }
+
+        function showClinicRegistration() {
+            document.getElementById('role-selector').style.display = 'none';
+            document.getElementById('auth-form').style.display = 'none';
+            document.getElementById('clinic-reg-form').style.display = 'block';
+            document.getElementById('clinic-reg-success').style.display = 'none';
+            document.getElementById('gate-subtitle').innerText = 'Clinic Registration';
+        }
+
+        function hideClinicRegistration() {
+            resetRole();
+        }
+
+        function submitClinicRegistration() {
+            const clinicName = document.getElementById('reg-clinic-name').value.trim();
+            const npi = document.getElementById('reg-clinic-npi').value.trim();
+            const email = document.getElementById('reg-clinic-email').value.trim();
+            if (!clinicName || !npi || !email) {
+                alert('Please complete all clinic registration fields.');
+                return;
+            }
+            localStorage.setItem('clinic_registration_request', JSON.stringify({
+                clinicName,
+                npi,
+                email,
+                submittedAt: new Date().toISOString()
+            }));
+            document.getElementById('clinic-reg-form').style.display = 'none';
+            document.getElementById('clinic-reg-success').style.display = 'block';
+        }
+
+        async function checkAuth() {
+            const error = document.getElementById('gate-error');
+            
+            if (typeof grecaptcha === 'undefined') {
+                error.innerText = 'Security verification is still loading. Please refresh or try again in a moment.';
+                error.style.display = 'block';
+                return;
+            }
+
+            const recaptchaToken = grecaptcha.getResponse();
+            if (!recaptchaToken) {
+                error.innerText = 'Please complete the security verification.';
+                error.style.display = 'block';
+                return;
+            }
+
+            if (window.handlePortalAuth) {
+                let handled = false;
+                if (selectedRole === 'patient') {
+                    if (activePatientTab === 'quick') {
+                        const key = document.getElementById('demo-passkey').value;
+                        handled = await window.handlePortalAuth('patient', key);
+                    } else if (activePatientTab === 'signin') {
+                        handled = await window.handlePortalAuth('patient', ''); // Email & pass only
+                    } else if (activePatientTab === 'activate') {
+                        const key = document.getElementById('demo-passkey').value;
+                        handled = await window.handlePortalAuth('patient', key); // Name, email, pass, and clinic code
+                    }
+                } else {
+                    const key = document.getElementById('demo-passkey').value;
+                    handled = await window.handlePortalAuth(selectedRole, key);
+                }
+                if (handled) return;
+            }
+
+            if (selectedRole === 'patient') {
+                error.innerText = 'Patient login is still loading. Please try again in a moment.';
+                error.style.display = 'block';
+                return;
+            }
+            
+            error.innerText = selectedRole === 'clinic'
+                ? 'Clinic key verification is still loading. Please try again in a moment.'
+                : 'Invalid Credentials. Access Denied.';
+            error.style.display = 'block';
+            document.getElementById('demo-passkey').value = '';
+            grecaptcha.reset();
+        }
+    </script>
+
+    <div id="app-mount" class="app-wrapper" style="display: none;">
+        <script>
+            if (sessionStorage.getItem('cyrax_auth') === 'true') {
+                document.getElementById('demo-gate').style.display = 'none';
+                document.getElementById('app-mount').style.display = 'flex';
+            }
+        </script>
+        
+        <!-- Clinic Sidebar -->
+        <aside class="sidebar" id="sidebar-clinic" style="display: none;">
+            <div class="sidebar-header">
+                <div class="logo-word">CyraxoHealth</div>
+                <div class="badge-role clinic">Clinic Node</div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" onclick="switchView('dashboard')" id="nav-dashboard" class="nav-item active">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    Analysis
+                </a>
+                <a href="#" onclick="switchView('patients')" id="nav-patients" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    Patients
+                </a>
+                <a href="#" onclick="switchView('clinic-reports')" id="nav-clinic-reports" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>
+                    Reports
+                </a>
+                <a href="#" onclick="switchView('analytics')" id="nav-analytics" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    Analytics
+                </a>
+                <a href="#" onclick="switchView('settings')" id="nav-settings" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    Settings
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Patient Sidebar -->
+        <aside class="sidebar" id="sidebar-patient" style="display: none;">
+            <div class="sidebar-header">
+                <div class="logo-word">CyraxoHealth</div>
+                <div class="badge-role patient">Recovery Node</div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" onclick="switchView('recovery')" id="nav-recovery" class="nav-item active">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    My Plan
+                </a>
+                <a href="#" onclick="switchView('calendar')" id="nav-calendar" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    Schedule
+                </a>
+                <a href="#" onclick="switchView('progress')" id="nav-progress" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                    Progress
+                </a>
+                <a href="#" onclick="switchView('patient-settings')" id="nav-patient-settings" class="nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                    Settings
+                </a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <div style="display: flex; align-items: center;">
+                    <button class="mobile-sidebar-toggle" onclick="toggleAppSidebar()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                    </button>
+                    <div class="breadcrumb" id="breadcrumb-text">
+                    Portal / <span>Dashboard</span>
+                    </div>
+                </div>
+                <div class="user-profile">
+                    <div class="user-info">
+                        <span class="user-name" id="display-name">Loading...</span>
+                        <div class="clinic-name" id="display-subtext">...</div>
+                    </div>
+                    <div class="avatar" id="display-avatar">🩺</div>
+                </div>
+            </header>
+
+            <div class="workspace">
+                
+                <!-- CLINIC VIEWS -->
+                <div id="view-dashboard" class="app-view clinic-only">
+                    <div class="header">
+                        <h1>Motion Analysis</h1>
+                        <p>Evaluate patient range of motion dynamically.</p>
+                    </div>
+                    <div class="panel">
+                        <div class="control-group" style="margin-bottom: 24px;">
+                            <label>Analysis Model</label>
+                            <select id="profile-type">
+                                <option value="side">Sagittal Alignment (Side)</option>
+                                <option value="back">Coronal Symmetry (Back)</option>
+                            </select>
+                        </div>
+                        <div class="canvas-container">
+                            <div class="status-overlay" id="status-overlay">Waiting for Video Input...</div>
+                            <img id="input-image" style="display: none;" />
+                            <video id="clinic-video" style="display: none;" playsinline></video>
+                            <canvas id="output-canvas"></canvas>
+                            <div class="camera-mini-controls" aria-label="Camera controls">
+                                <button class="camera-icon-btn" type="button" onclick="flipClinicCamera()" aria-label="Flip camera" title="Flip camera">↺</button>
+                                <button id="clinic-wide-toggle" class="camera-icon-btn camera-wide-btn" type="button" onclick="toggleClinicWideCamera()" aria-label="Toggle wide angle" title="Wide angle">0.5x</button>
+                            </div>
+                        </div>
+                        <button id="clinic-camera-toggle" class="btn" style="width: 100%; margin-top: 16px;" onclick="toggleClinicCameraSession()">Start Clinic Camera</button>
+                        <div class="clinic-metrics-grid">
+                            <div class="panel" style="box-shadow: none; border: 1px solid rgba(0,0,0,0.05);">
+                                <h3 style="font-size: 1.1rem; color: var(--primary-dark); margin-bottom: 12px;">Cervical</h3>
+                                <div id="metric-cervical" style="font-size: 1.05rem; font-weight: 700;">--</div>
+                            </div>
+                            <div class="panel" style="box-shadow: none; border: 1px solid rgba(0,0,0,0.05);">
+                                <h3 style="font-size: 1.1rem; color: var(--primary-dark); margin-bottom: 12px;">Thoracic</h3>
+                                <div id="metric-thoracic" style="font-size: 1.05rem; font-weight: 700;">--</div>
+                            </div>
+                            <div class="panel" style="box-shadow: none; border: 1px solid rgba(0,0,0,0.05);">
+                                <h3 style="font-size: 1.1rem; color: var(--primary-dark); margin-bottom: 12px;">Pelvic</h3>
+                                <div id="metric-pelvic" style="font-size: 1.05rem; font-weight: 700;">--</div>
+                            </div>
+                            <div class="panel" style="box-shadow: none; border: 1px solid rgba(0,0,0,0.05); background: var(--primary); color: white;">
+                                <h3 style="font-size: 1.1rem; color: rgba(255,255,255,0.8); margin-bottom: 12px;">Overall Score</h3>
+                                <div id="metric-overall" style="font-size: 1.5rem; font-weight: 700;">--</div>
+                            </div>
+                        </div>
+                        <div class="analysis-workbench">
+                            <div class="analysis-status-card">
+                                <span>Model State</span>
+                                <strong id="clinic-analysis-state">Standby</strong>
+                                <p id="clinic-analysis-status">Choose a model and start the camera to begin calibration.</p>
+                            </div>
+                            <div class="analysis-score-card">
+                                <div><span>Cervical</span><strong id="clinic-score-cervical">--</strong></div>
+                                <div class="analysis-meter"><span id="clinic-meter-cervical"></span></div>
+                            </div>
+                            <div class="analysis-score-card">
+                                <div><span>Thoracic</span><strong id="clinic-score-thoracic">--</strong></div>
+                                <div class="analysis-meter"><span id="clinic-meter-thoracic"></span></div>
+                            </div>
+                            <div class="analysis-score-card">
+                                <div><span>Pelvic</span><strong id="clinic-score-pelvic">--</strong></div>
+                                <div class="analysis-meter"><span id="clinic-meter-pelvic"></span></div>
+                            </div>
+                        </div>
+                        <div class="panel" style="margin-top: 16px; background: var(--clay-bg); border: 1px solid var(--primary-light);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <h3 style="font-size: 1.1rem; color: var(--primary-dark); margin: 0;">AI Clinical Insight</h3>
+                                <button id="btn-generate-insight" class="btn" style="padding: 6px 12px; font-size: 0.8rem;" onclick="generateClinicInsight()">Generate</button>
+                            </div>
+                            <p id="clinic-ai-insight" style="font-size: 0.95rem; color: var(--text-main); line-height: 1.5; margin: 0;">Capture stable telemetry to generate an automated assessment.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-patients" class="app-view clinic-only">
+                    <div class="header">
+                        <h1>Patient Directory</h1>
+                        <p>Manage prescriptions and physical therapy plans.</p>
+                    </div>
+                    <div class="panel">
+                        <div class="roster-header">
+                            <div>
+                                <h3>Active Roster</h3>
+                                <p id="patient-plan-status" class="tier-status">Loading plan capacity...</p>
+                            </div>
+                            <button class="btn" onclick="showNewPatientModal()">+ Register Patient</button>
+                        </div>
+                        <div class="roster-controls">
+                            <div class="control-group roster-search">
+                                <label>Search Roster</label>
+                                <input type="text" id="patient-roster-search" placeholder="Search ID, injury, status, or access code" oninput="filterPatientRoster()">
+                            </div>
+                            <div class="control-group roster-sort">
+                                <label>Sort By</label>
+                                <select id="patient-roster-sort" onchange="filterPatientRoster()">
+                                    <option value="created-desc">Newest Added</option>
+                                    <option value="created-asc">Oldest Added</option>
+                                    <option value="injury-asc">Injury A-Z</option>
+                                    <option value="external-id-asc">Patient ID A-Z</option>
+                                    <option value="code-asc">Access Code A-Z</option>
+                                    <option value="latest-desc">Latest Session</option>
+                                    <option value="progress-desc">Progress</option>
+                                </select>
+                            </div>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr>
+	                                    <th>Access Code</th>
+	                                    <th>Patient ID</th>
+	                                    <th>Status</th>
+	                                    <th>Condition</th>
+	                                    <th>Sessions</th>
+	                                    <th>Latest</th>
+	                                    <th>Progress</th>
+	                                    <th>Actions</th>
+	                                </tr>
+                            </thead>
+                            <tbody id="patient-list-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                
+                <div id="view-clinic-schedule" class="app-view clinic-only" style="display: none;">
+                    <div class="header">
+                        <h1>Manage Schedule <span id="schedule-px-title" style="color: var(--primary); font-size: 1.2rem; margin-left: 12px;"></span></h1>
+                        <p>Add appointments by date, assign daily exercises, and review synced patient session data.</p>
+                    </div>
+                    <div class="panel">
+                        <div class="schedule-toolbar">
+                            <button class="btn btn-secondary" onclick="switchView('patients')">← Back to Roster</button>
+                            <div class="schedule-legend">
+                                <span class="legend-pill legend-telehealth">Telehealth</span>
+                                <span class="legend-pill legend-clinic">Clinic Visit</span>
+                                <span class="legend-pill legend-lab">Lab / Imaging</span>
+                            </div>
+                        </div>
+                        <div class="schedule-manager">
+                            <div class="schedule-builder">
+                                <div class="schedule-card-head">
+                                    <h3>Add Appointment</h3>
+                                    <p id="schedule-patient-meta">Select a patient from the roster.</p>
+                                </div>
+                                <div class="schedule-form-grid">
+                                    <div class="control-group">
+                                        <label>Date</label>
+                                        <input type="date" id="schedule-date">
+                                    </div>
+                                    <div class="control-group">
+                                        <label>Time</label>
+                                        <input type="time" id="schedule-time" value="09:00">
+                                    </div>
+                                    <div class="control-group">
+                                        <label>Visit Type</label>
+                                        <select id="schedule-type">
+                                            <option value="telehealth">Telehealth Check-in</option>
+                                            <option value="clinic">In-Clinic Visit</option>
+                                            <option value="lab">Lab / Imaging</option>
+                                        </select>
+                                    </div>
+                                </div>
+	                            <div class="schedule-notes-row">
+	                                <div class="control-group">
+	                                    <label>Clinical Notes</label>
+	                                    <textarea id="schedule-notes" rows="2" placeholder="Reason for visit, provider instructions, or patient reminders"></textarea>
+	                                </div>
+	                                <button class="btn" onclick="addScheduleAppointment()">Add to Schedule</button>
+	                            </div>
+	                        </div>
+	                        <div class="schedule-builder">
+	                            <div class="schedule-card-head">
+	                                <h3>Assign Exercises</h3>
+	                                <p>Choose a day, add clinic-specific exercises, and reorder or remove them from the patient plan.</p>
+	                            </div>
+	                            <div class="schedule-form-grid">
+	                                <div class="control-group">
+	                                    <label>Plan Day</label>
+	                                    <select id="schedule-exercise-day" onchange="renderSelectedScheduleDayExercises()"></select>
+	                                </div>
+	                                <div class="control-group">
+	                                    <label>Exercise</label>
+	                                    <select id="schedule-exercise-select"></select>
+	                                </div>
+	                                <div class="control-group">
+	                                    <label>Target Reps</label>
+	                                    <input type="number" id="schedule-exercise-reps" min="1" max="60" value="10">
+	                                </div>
+	                            </div>
+	                            <div class="schedule-notes-row">
+	                                <div class="control-group">
+	                                    <label>Day Instructions</label>
+	                                    <textarea id="schedule-exercise-note" rows="2" placeholder="Optional cue, restriction, or progression note"></textarea>
+	                                </div>
+	                                <button class="btn" onclick="addExerciseToScheduleDay()">Add Exercise</button>
+	                            </div>
+	                            <div id="schedule-day-exercise-list" class="schedule-day-exercise-list"></div>
+	                        </div>
+	                        <div class="schedule-list-card">
+	                            <div class="schedule-card-head">
+	                                <h3>Patient Schedule</h3>
+	                                <p>Upcoming appointments and care milestones.</p>
+	                            </div>
+	                            <div id="schedule-appointment-list" class="schedule-appointment-list"></div>
+	                            <div class="schedule-card-head schedule-session-head">
+	                                <h3>Session Data</h3>
+	                                <p>Synced home sessions and report-ready motion metrics.</p>
+	                            </div>
+	                            <div id="schedule-session-list" class="clinic-session-review-list"></div>
+	                        </div>
+	                    </div>
+                        <div class="calendar-section-head">
+                            <div>
+                                <h3>Plan Calendar</h3>
+                                <p>Click a day to review and modify its assigned exercises.</p>
+                            </div>
+                        </div>
+                        <div id="clinic-editable-calendar" class="calendar-grid clinic-calendar-grid"></div>
+                    </div>
+                </div>
+                <div id="view-analytics" class="app-view clinic-only">
+                    <div class="header"><h1>Analytics</h1></div>
+                    <div class="panel"><p>Clinic-wide metrics will populate here.</p></div>
+                </div>
+                <div id="view-clinic-reports" class="app-view clinic-only">
+                    <div class="header">
+                        <h1>Reports</h1>
+                        <p>Download formatted patient progress reports with clinic branding.</p>
+                    </div>
+                    <div class="panel">
+                        <div class="roster-header">
+                            <div>
+                                <h3>Patient Progress Reports</h3>
+                                <p class="tier-status">Choose a patient from the roster, then download the report from the review window.</p>
+                            </div>
+                            <button class="btn" onclick="switchView('patients')">Open Patient Roster</button>
+                        </div>
+                        <div id="clinic-report-list" class="exercises-grid"></div>
+                    </div>
+                </div>
+                <div id="view-settings" class="app-view">
+                    <div class="header"><h1>Settings</h1></div>
+                    <div class="panel" style="max-width: 500px;">
+                        <h3 style="margin-bottom: 24px;">Clinic Report Branding</h3>
+                        <div class="control-group" style="margin-bottom: 16px;">
+                            <label>Clinic Name</label>
+                            <input type="text" id="clinic-report-name" placeholder="Clinic name">
+                        </div>
+                        <div class="control-group" style="margin-bottom: 16px;">
+                            <label>Clinic Contact</label>
+                            <input type="text" id="clinic-report-contact" placeholder="Phone or email">
+                        </div>
+                        <div class="control-group" style="margin-bottom: 16px;">
+                            <label>Clinic Logo</label>
+                            <input type="file" id="clinic-report-logo" accept="image/*">
+                            <div id="clinic-report-logo-preview" style="margin-top: 12px; min-height: 72px; border: 1px dashed rgba(100,116,139,0.35); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); overflow: hidden;">No logo uploaded</div>
+                        </div>
+                        <button class="btn" onclick="saveClinicReportSettings()" style="width: 100%; margin-bottom: 32px;">Save Report Settings</button>
+                        <h3 style="margin-bottom: 24px;">Application Preferences</h3>
+                        <div class="control-group" style="margin-bottom: 16px;">
+                            <label>AI Tracking Sensitivity</label>
+                            <select>
+                                <option>High (Clinical Precision)</option>
+                                <option selected>Medium (Standard)</option>
+                                <option>Low (Forgiving)</option>
+                            </select>
+                        </div>
+                        <div class="control-group" style="margin-bottom: 32px;">
+                            <label>Data Sharing with Clinic</label>
+                            <select>
+                                <option selected>Sync all sessions securely</option>
+                                <option>Sync weekly summary only</option>
+                                <option>Do not sync</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-secondary" onclick="logoutApp()" style="width: 100%;">Logout / Switch Portal</button>
+                    </div>
+                </div>
+
+
+                <!-- PATIENT VIEWS -->
+                <div id="view-recovery" class="app-view patient-only">
+                    <div class="header">
+                        <h1>My Recovery Plan</h1>
+                        <p>Prescribed by <span id="attending-physician">Clinic</span></p>
+                    </div>
+                    
+                    <div class="grid-2">
+                        <div class="panel">
+                            <h3 style="margin-bottom: 24px; font-size: 1.4rem;">Daily Exercises</h3>
+                            <div id="patient-exercise-list" class="exercises-grid">
+                                <p style="color: var(--text-muted);">Loading plan...</p>
+                            </div>
+                        </div>
+                        
+                        <div class="panel" style="background: var(--glass-bg); border: 2px solid var(--primary-light);">
+                            <h3 style="margin-bottom: 24px; font-size: 1.4rem;">Motion Analysis: <span id="current-exercise-name" style="color: var(--primary);">Standby</span></h3>
+                            <p style="color: var(--text-muted); margin-bottom: 24px; font-weight: 500;">Please position your camera to capture your <strong style="color: var(--primary-dark);">side profile</strong>. A sagittal (side-on) view allows the AI to accurately track joint flexion and spinal alignment.</p>
+                            <div class="canvas-container" style="height: 300px; margin-bottom: 24px; position: relative;">
+                                <div class="status-overlay" id="patient-status-overlay">Camera Offline</div>
+                                
+                                <div id="session-instructions" style="display: none; position: absolute; top: 16px; left: 50%; transform: translateX(-50%); background: rgba(255,255,255,0.9); padding: 12px 18px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); font-weight: 600; color: var(--primary-dark); text-align: center; z-index: 10; width: 88%; max-width: 560px; line-height: 1.35; backdrop-filter: blur(4px); transition: all 0.3s ease;">
+                                    Align your body within the frame.
+                                </div>
+
+                                <div id="session-progress-bar-container" style="display: none; position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); width: 85%; background: rgba(255,255,255,0.4); height: 8px; border-radius: 4px; overflow: hidden; z-index: 10;">
+                                    <div id="session-progress-bar" style="width: 0%; height: 100%; background: var(--primary); transition: width 0.5s ease;"></div>
+                                </div>
+
+                                <video id="patient-video" style="display: none;" playsinline></video>
+                                <canvas id="patient-output-canvas"></canvas>
+                                <div class="camera-mini-controls" aria-label="Camera controls">
+                                    <button class="camera-icon-btn" type="button" onclick="flipPatientCamera()" aria-label="Flip camera" title="Flip camera">↺</button>
+                                    <button id="patient-wide-toggle" class="camera-icon-btn camera-wide-btn" type="button" onclick="togglePatientWideCamera()" aria-label="Toggle wide angle" title="Wide angle">0.5x</button>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 12px;">
+                                <button id="start-session-btn" class="btn" style="flex: 1;" onclick="startPatientCameraSession()">Start Session</button>
+                                <button id="end-session-btn" class="btn btn-secondary" style="flex: 1; display: none;" onclick="endPatientCameraSession()">End Session</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-calendar" class="app-view patient-only">
+                    <div class="header"><h1>Schedule</h1></div>
+	            <div class="panel">
+	                <div id="today-schedule-panel" class="today-schedule-panel"></div>
+	                <div id="recovery-calendar" class="calendar-grid patient-calendar-grid"></div>
+	            </div>
+	        </div>
+
+                <div id="view-progress" class="app-view patient-only">
+                    <div class="header"><h1>Progress</h1></div>
+                    <div class="panel">
+	                        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px;">
+	                            <div class="panel" style="padding: 16px; border: 1px solid rgba(0,0,0,0.05); box-shadow: none;">
+	                                <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Sessions</div>
+	                                <div id="patient-progress-sessions" style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">0</div>
+                            </div>
+                            <div class="panel" style="padding: 16px; border: 1px solid rgba(0,0,0,0.05); box-shadow: none;">
+                                <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Latest ROM</div>
+                                <div id="patient-progress-rom" style="font-size: 1.8rem; font-weight: 800; color: #10B981;">--</div>
+                            </div>
+                            <div class="panel" style="padding: 16px; border: 1px solid rgba(0,0,0,0.05); box-shadow: none;">
+	                                <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Latest Reps</div>
+	                                <div id="patient-progress-reps" style="font-size: 1.8rem; font-weight: 800; color: #F59E0B;">--</div>
+	                            </div>
+	                            <div class="panel" style="padding: 16px; border: 1px solid rgba(0,0,0,0.05); box-shadow: none;">
+	                                <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Adherence</div>
+	                                <div id="patient-progress-adherence" style="font-size: 1.8rem; font-weight: 800; color: #6366F1;">--</div>
+	                            </div>
+	                        </div>
+	                        <div>
+	                            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">Next Focus</div>
+	                            <p id="patient-progress-targets" style="font-weight: 600; color: var(--text-main);">Complete a guided session to generate targeted recommendations.</p>
+	                        </div>
+	                        <div class="progress-detail-grid">
+	                            <div>
+	                                <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">ROM Trend</div>
+	                                <div id="patient-progress-trend" class="trend-chart"></div>
+	                            </div>
+	                            <div>
+	                                <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">Session History</div>
+	                                <div id="patient-session-history" class="session-history"></div>
+	                            </div>
+	                        </div>
+	                    </div>
+	                </div>
+
+                <div id="view-patient-settings" class="app-view patient-only">
+                    <div class="header"><h1>Settings</h1></div>
+                    <div class="panel" style="max-width: 500px;">
+                        <h3 style="margin-bottom: 24px;">Application Preferences</h3>
+                        <div class="patient-id-card">
+                            <span>Clinic Patient ID</span>
+                            <strong id="patient-settings-clinic-id">Not assigned</strong>
+                        </div>
+                        <div class="control-group" style="margin-bottom: 16px;">
+                            <label>Notification Preferences</label>
+                            <select id="patient-notification-pref" onchange="savePatientPreferences()">
+                                <option selected>Email and Push</option>
+                                <option>Push only</option>
+                                <option>None</option>
+                            </select>
+                        </div>
+                        <div class="control-group" style="margin-bottom: 32px;">
+                            <label>Data Sharing with Clinic</label>
+                            <select id="patient-sharing-pref" onchange="savePatientPreferences()">
+                                <option selected>Sync all sessions securely</option>
+                                <option>Sync weekly summary only</option>
+                                <option>Do not sync</option>
+                            </select>
+                        </div>
+                        <p id="patient-settings-status" style="min-height: 20px; color: var(--primary); font-weight: 700; margin-bottom: 16px;"></p>
+                        <button class="btn btn-secondary" onclick="logoutApp()" style="width: 100%;">Logout / Switch Portal</button>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="patient-modal" class="gate-overlay" style="display: none;">
+        <div class="gate-card glass-panel">
+            <h3 style="font-size: 1.8rem; margin-bottom: 8px;">New Patient</h3>
+            <p style="color: var(--text-muted); margin-bottom: 24px;">Configure physical therapy profile.</p>
+            
+	            <div style="text-align: left;">
+                <div class="control-group" style="margin-bottom: 16px;">
+                    <label>Clinic Patient ID</label>
+                    <input type="text" id="reg-external-id" placeholder="e.g. MRN-10482 or EHR-5821">
+                </div>
+                <div class="control-group" style="margin-bottom: 16px;">
+                    <label>Condition / Injury</label>
+                    <input type="text" id="reg-injury" placeholder="e.g. Rotator Cuff Tear">
+                </div>
+                <div class="schedule-form-grid" style="margin-bottom: 16px;">
+                    <div class="control-group">
+                        <label>Current ROM Baseline</label>
+                        <input type="number" id="reg-rom-baseline" min="0" max="180" placeholder="e.g. 82" required>
+                    </div>
+                    <div class="control-group">
+                        <label>Target ROM</label>
+                        <input type="number" id="reg-rom-target" min="0" max="180" placeholder="e.g. 140" required>
+                    </div>
+                    <div class="control-group">
+                        <label>ROM Unit</label>
+                        <select id="reg-rom-unit">
+                            <option value="degrees" selected>Degrees</option>
+                            <option value="percent">Percent</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="control-group" style="margin-bottom: 16px;">
+                    <label>Intensity</label>
+                    <select id="reg-intensity">
+                        <option value="low">Low (Mobility)</option>
+                        <option value="medium" selected>Medium (Strengthening)</option>
+                        <option value="high">High (Sport Recovery)</option>
+                    </select>
+                </div>
+	                <div class="control-group" style="margin-bottom: 32px;">
+	                    <label>Duration (Weeks)</label>
+	                    <input type="number" id="reg-timeline" value="4">
+	                </div>
+	                <div class="custom-exercise-builder">
+	                    <h4>Clinic-Specific Exercises</h4>
+	                    <p>Add exercises that should be included in this patient's plan.</p>
+	                    <div class="schedule-form-grid">
+	                        <div class="control-group">
+	                            <label>Exercise Name</label>
+	                            <input type="text" id="reg-custom-ex-title" placeholder="e.g. Terminal Knee Extension">
+	                        </div>
+	                        <div class="control-group">
+	                            <label>Sets / Volume</label>
+	                            <input type="text" id="reg-custom-ex-sets" placeholder="3 sets of 10">
+	                        </div>
+	                    </div>
+	                    <div class="control-group" style="margin-bottom: 12px;">
+	                        <label>Instructions / Cue</label>
+	                        <textarea id="reg-custom-ex-detail" rows="2" placeholder="Clinical cue, restriction, or setup note"></textarea>
+	                    </div>
+	                    <button class="btn btn-secondary" type="button" style="width: 100%; margin-bottom: 12px;" onclick="addCustomExerciseToNewPatient()">Add Exercise</button>
+	                    <div id="reg-custom-ex-list" class="custom-exercise-list"></div>
+	                </div>
+	                
+	                <button class="btn" style="width: 100%; margin-bottom: 12px;" onclick="registerPatient()">Generate Plan</button>
+                <button class="btn btn-secondary" style="width: 100%;" onclick="closePatientModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="code-result-modal" class="gate-overlay" style="display: none;">
+        <div class="gate-card glass-panel">
+            <h3 style="font-size: 1.8rem; margin-bottom: 8px;">Access Code Generated</h3>
+            <p style="color: var(--text-muted); margin-bottom: 24px;">Share this securely with the patient.</p>
+            
+            <div id="generated-code" style="font-size: 3rem; font-weight: 800; color: var(--primary); letter-spacing: 0.1em; margin: 32px 0; background: var(--clay-bg); padding: 20px; border-radius: var(--radius-md); box-shadow: var(--clay-shadow);">
+                ------
+            </div>
+            
+            <button class="btn" style="width: 100%;" onclick="closeCodeModal()">Done</button>
+        </div>
+    </div>
+
+    <!-- Exercise Details Modal -->
+    <div id="exercise-details-modal" class="gate-overlay" style="display: none; z-index: 999;">
+        <div class="gate-card glass-panel exercise-modal-card" role="dialog" aria-modal="true" aria-labelledby="ex-modal-title">
+            <div class="exercise-modal-head">
+                <div id="ex-modal-icon" class="exercise-modal-icon">+</div>
+                <div class="exercise-modal-title">
+                    <h3 id="ex-modal-title">Exercise</h3>
+                    <p id="ex-modal-desc">Move slowly and stay within a comfortable range.</p>
+                </div>
+                <button class="exercise-close-btn" type="button" onclick="closeExerciseModal()" aria-label="Close exercise details">×</button>
+            </div>
+            <div class="exercise-modal-body">
+                <div class="exercise-modal-meta">
+                    <span id="ex-modal-duration">Duration: As prescribed</span>
+                    <span id="ex-modal-focus">Focus: Controlled movement</span>
+                </div>
+                <h4>Step-by-Step Instructions</h4>
+                <ol id="ex-modal-steps" class="exercise-step-list">
+                    <!-- Steps populated via JS -->
+                </ol>
+                <p class="exercise-safety-note">Stay within a pain-free range. Stop and contact your provider if symptoms increase or you feel unstable.</p>
+                <div class="exercise-modal-actions">
+                    <button class="btn" style="flex: 2;" onclick="startExerciseFromModal()">Start Guided Session</button>
+                    <button class="btn btn-secondary" style="flex: 1;" onclick="closeExerciseModal()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session Complete Modal -->
+    <div id="session-complete-modal" class="gate-overlay" style="display: none; z-index: 999;">
+        <div class="gate-card glass-panel" style="max-width: 600px; text-align: left;">
+            <h3 style="font-size: 1.8rem; margin-bottom: 8px; color: var(--primary-dark);">Session Complete</h3>
+            <p style="color: var(--text-muted); margin-bottom: 24px;">Biomechanical analysis successfully captured.</p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px;">
+                <div class="panel" style="padding: 16px; border: 1px solid rgba(0,0,0,0.05); box-shadow: none;">
+                    <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Range of Motion</div>
+                    <div id="session-rom" style="font-size: 1.8rem; font-weight: 800; color: #10B981;">88%</div>
+                </div>
+                <div class="panel" style="padding: 16px; border: 1px solid rgba(0,0,0,0.05); box-shadow: none;">
+                    <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Est. Recovery Left</div>
+                    <div id="session-time" style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">2.4 Weeks</div>
+                </div>
+                <div class="panel" style="padding: 16px; border: 1px solid rgba(0,0,0,0.05); box-shadow: none; grid-column: span 2;">
+                    <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">Target Areas for Next Session</div>
+                    <div id="session-targets" style="font-weight: 600;">Left Scapular Retraction, Internal Rotation</div>
+                </div>
+                <div class="panel" style="padding: 16px; border: 1px solid rgba(0,0,0,0.05); box-shadow: none; grid-column: span 2;">
+                    <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px;">Verification</div>
+                    <div id="session-verification" style="font-weight: 700; color: var(--text-main);">Analyzing local kinematics and Gemini consistency...</div>
+                    <div id="session-verification-note" style="font-size: 0.82rem; color: var(--text-muted); margin-top: 6px;"></div>
+                </div>
+            </div>
+            
+            <button class="btn" style="width: 100%;" onclick="closeSessionCompleteModal()">Return to Dashboard</button>
+        </div>
+    </div>
+
+    <!-- Clinic Patient Detailed Report Modal -->
+    <div id="clinic-patient-report-modal" class="gate-overlay" style="display: none; z-index: 999;">
+        <div class="gate-card glass-panel" style="max-width: 650px; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h3 style="font-size: 1.8rem; margin: 0; color: var(--primary-dark);">Clinical Biomechanical Report</h3>
+                <button class="btn btn-secondary" onclick="document.getElementById('clinic-patient-report-modal').style.display='none'" style="padding: 4px 12px;">X</button>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+                <div class="panel" style="padding: 16px; border: 1px solid rgba(0,0,0,0.05); box-shadow: none;">
+                    <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Max Flexion</div>
+                    <div id="clinic-rep-flexion" style="font-size: 1.8rem; font-weight: 800; color: #10B981;">114°</div>
+                    <div id="clinic-rep-flexion-exp" style="font-size: 0.75rem; color: var(--text-muted);">Expected: >120°</div>
+                </div>
+                <div class="panel" style="padding: 16px; border: 1px solid rgba(0,0,0,0.05); box-shadow: none;">
+                    <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Max Extension</div>
+                    <div id="clinic-rep-extension" style="font-size: 1.8rem; font-weight: 800; color: var(--primary);">172°</div>
+                    <div id="clinic-rep-extension-exp" style="font-size: 0.75rem; color: var(--text-muted);">Expected: 180°</div>
+                </div>
+                <div class="panel" style="padding: 16px; border: 1px solid rgba(0,0,0,0.05); box-shadow: none;">
+                    <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Kinetic Smoothness</div>
+                    <div id="clinic-rep-smoothness" style="font-size: 1.8rem; font-weight: 800; color: #F59E0B;">78%</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">Tremor detected in eccentric phase</div>
+                </div>
+                <div class="panel" style="padding: 16px; border: 1px solid rgba(0,0,0,0.05); box-shadow: none;">
+                    <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase;">Overall Compliance</div>
+                    <div id="clinic-rep-compliance" style="font-size: 1.8rem; font-weight: 800; color: #10B981;">92%</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">Completed 26/28 prescribed sessions</div>
+                </div>
+            </div>
+            
+            <h4 style="margin-bottom: 12px; color: var(--primary-dark);">AI Clinical Assessment</h4>
+            <p id="clinic-rep-assessment" style="color: var(--text-main); font-size: 0.95rem; line-height: 1.6; background: var(--clay-bg); padding: 16px; border-radius: var(--radius-md);">
+                Patient exhibits limited terminal extension (-8° deficit). Recommend increasing band tension during Terminal Knee Extensions and adding manual tissue release around the patellar tendon.
+            </p>
+            <div class="clinic-session-review">
+                <div class="clinic-session-review-head">
+                    <div>
+                        <h4>Home Session Review</h4>
+                        <p>Session-level motion analysis, verification confidence, and tracking quality.</p>
+                    </div>
+                </div>
+                <div id="clinic-session-review-list" class="clinic-session-review-list"></div>
+            </div>
+            <button class="btn" id="clinic-download-report-btn" style="width: 100%; margin-top: 18px;" onclick="downloadActiveClinicReport()">Download Formatted Report</button>
+        </div>
+    </div>
+
+    <script type="module" src="app.js?v=7"></script>
+</body>
+</html>
